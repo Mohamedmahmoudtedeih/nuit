@@ -86,9 +86,8 @@ const ListingDetails = () => {
   }
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: currency,
+    // Format as number with thousand separators, without currency symbol
+    return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);

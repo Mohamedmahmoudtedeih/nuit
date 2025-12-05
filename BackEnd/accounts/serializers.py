@@ -48,11 +48,14 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if phone and password:
-            user = authenticate(request=self.context.get('request'), phone=phone, password=password)
+            # Normalize phone number for authentication
+            phone_normalized = phone.strip()
+            
+            user = authenticate(request=self.context.get('request'), phone=phone_normalized, password=password)
             if not user:
-                raise serializers.ValidationError('Invalid phone number or password.')
+                raise serializers.ValidationError({'phone': ['Invalid phone number or password.']})
             if not user.is_active:
-                raise serializers.ValidationError('User account is disabled.')
+                raise serializers.ValidationError({'phone': ['User account is disabled.']})
             attrs['user'] = user
         else:
             raise serializers.ValidationError('Must include "phone" and "password".')

@@ -67,8 +67,24 @@ class ApiClient {
     }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
-        throw new Error(error.detail || error.message || 'Request failed');
+        let error;
+        try {
+          error = await response.json();
+        } catch {
+          error = { detail: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        // Log the full error for debugging
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: error
+        });
+        
+        // Return the full error object so we can access specific field errors
+        const errorObj = new Error(error.detail || error.message || error.phone?.[0] || error.password?.[0] || 'Request failed');
+        (errorObj as any).response = error;
+        throw errorObj;
       }
 
       return response.json();
@@ -387,8 +403,10 @@ class ApiClient {
   }
 
   async getMyListings() {
-    const response = await this.request<{ results: any[] }>('/listings/my_listings/');
-    return response.results.map(this.transformListing);
+    const response = await this.request<{ results: any[] } | any[]>('/listings/my_listings/');
+    // Handle both response formats: { results: [...] } or [...]
+    const listings = Array.isArray(response) ? response : (response.results || []);
+    return listings.map(this.transformListing);
   }
 
   async getAllListings() {
@@ -425,10 +443,60 @@ class ApiClient {
       price: apiListing.price ? parseFloat(apiListing.price) : 0,
       currency: apiListing.currency || 'AED',
       location: apiListing.location || '',
-      images: apiListing.images?.map((img: any) => {
-        const imageUrl = img.image || img;
-        return imageUrl?.startsWith('http') ? imageUrl : `http://localhost:8000${imageUrl}`;
-      }) || [],
+      images: (() => {
+        // Handle ListingListSerializer format (has first_image instead of images array)
+        if (apiListing.first_image) {
+          const imageUrl = apiListing.first_image;
+          if (typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+            return [imageUrl];
+          }
+          if (typeof imageUrl === 'string') {
+            const cleanUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+            return [`http://localhost:8000${cleanUrl}`];
+          }
+        }
+        
+        // Handle ListingSerializer format (has images array)
+        if (!apiListing.images || (Array.isArray(apiListing.images) && apiListing.images.length === 0)) {
+          return [];
+        }
+        
+        return apiListing.images.map((img: any) => {
+          // Handle different image formats from API
+          let imageUrl = null;
+          
+          // If img is a string (direct URL)
+          if (typeof img === 'string') {
+            imageUrl = img;
+          }
+          // If img is an object with image_url (from serializer)
+          else if (img.image_url) {
+            imageUrl = img.image_url;
+          }
+          // If img is an object with image field (relative path from Django)
+          else if (img.image) {
+            imageUrl = img.image;
+          }
+          
+          if (!imageUrl) {
+            return null;
+          }
+          
+          // If it's already a full URL, return as is
+          if (typeof imageUrl === 'string' && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+            return imageUrl;
+          }
+          
+          // If it's a relative path, prepend the base URL
+          if (typeof imageUrl === 'string') {
+            // Ensure the path starts with /
+            const cleanUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+            return `http://localhost:8000${cleanUrl}`;
+          }
+          
+          return null;
+        }).filter((img: any) => img !== null);
+      })(),
       userId: apiListing.user_id ? apiListing.user_id.toString() : (apiListing.user?.id ? apiListing.user.id.toString() : ''),
       user: apiListing.user ? {
         id: apiListing.user.id,

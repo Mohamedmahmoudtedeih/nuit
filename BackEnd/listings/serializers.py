@@ -6,10 +6,21 @@ from .models import Listing, ListingImage, CarDetails, PropertyDetails
 class ListingImageSerializer(serializers.ModelSerializer):
     """Serializer for listing images."""
     
+    image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = ListingImage
-        fields = ['id', 'image', 'order']
+        fields = ['id', 'image', 'image_url', 'order']
         read_only_fields = ['id']
+    
+    def get_image_url(self, obj):
+        """Get full image URL."""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class CarDetailsSerializer(serializers.ModelSerializer):

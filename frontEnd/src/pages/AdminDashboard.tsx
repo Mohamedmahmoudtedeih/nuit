@@ -195,9 +195,8 @@ const AdminDashboard = () => {
   };
 
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: currency,
+    // Format as number with thousand separators, without currency symbol
+    return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
@@ -308,12 +307,20 @@ Pouvez-vous me donner plus d'informations ?`;
                         className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                       >
                         {/* Image */}
-                        <div className="w-24 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
-                            src={listing.images[0]}
-                            alt={listing.title}
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-24 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
+                          {listing.images && listing.images.length > 0 ? (
+                            <img
+                              src={listing.images[0]}
+                              alt={listing.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                (e.target as HTMLImageElement).src = '/placeholder.svg';
+                              }}
+                            />
+                          ) : (
+                            <Package className="w-8 h-8 text-muted-foreground" />
+                          )}
                         </div>
 
                         {/* Info */}
@@ -401,12 +408,19 @@ Pouvez-vous me donner plus d'informations ?`;
                             {/* Left Column */}
                             <div className="space-y-4">
                               {/* Image */}
-                              <div className="relative aspect-video rounded-lg overflow-hidden">
-                                <img
-                                  src={listing.images[0]}
-                                  alt={listing.title}
-                                  className="w-full h-full object-cover"
-                                />
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                                {listing.images && listing.images.length > 0 ? (
+                                  <img
+                                    src={listing.images[0]}
+                                    alt={listing.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                                    }}
+                                  />
+                                ) : (
+                                  <Package className="w-16 h-16 text-muted-foreground" />
+                                )}
                               </div>
 
                               {/* Price and Location */}
@@ -574,12 +588,19 @@ Pouvez-vous me donner plus d'informations ?`;
                       className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       {/* Image */}
-                      <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                        <img
-                          src={listing.images[0]}
-                          alt={listing.title}
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
+                        {listing.images && listing.images.length > 0 ? (
+                          <img
+                            src={listing.images[0]}
+                            alt={listing.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/placeholder.svg';
+                            }}
+                          />
+                        ) : (
+                          <Package className="w-8 h-8 text-muted-foreground" />
+                        )}
                       </div>
 
                       {/* Info */}
@@ -675,12 +696,19 @@ Pouvez-vous me donner plus d'informations ?`;
                           {/* Left Column */}
                           <div className="space-y-4">
                             {/* Image */}
-                            <div className="relative aspect-video rounded-lg overflow-hidden">
-                              <img
-                                src={listing.images[0]}
-                                alt={listing.title}
-                                className="w-full h-full object-cover"
-                              />
+                            <div className="relative aspect-video rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                              {listing.images && listing.images.length > 0 ? (
+                                <img
+                                  src={listing.images[0]}
+                                  alt={listing.title}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/placeholder.svg';
+                                  }}
+                                />
+                              ) : (
+                                <Package className="w-16 h-16 text-muted-foreground" />
+                              )}
                             </div>
 
                             {/* Price and Location */}

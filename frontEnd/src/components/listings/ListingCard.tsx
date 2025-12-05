@@ -23,9 +23,8 @@ interface ListingCardProps {
 
 const ListingCard = ({ listing }: ListingCardProps) => {
   const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat('en-AE', {
-      style: 'currency',
-      currency: currency,
+    // Format as number with thousand separators, without currency symbol
+    return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
@@ -37,12 +36,25 @@ const ListingCard = ({ listing }: ListingCardProps) => {
     <Link to={`/listing/${listing.id}`}>
       <Card variant="listing" className="group h-full">
         {/* Image */}
-        <div className="relative aspect-[4/3] overflow-hidden">
-          <img
-            src={listing.images[0]}
-            alt={listing.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
+        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+          {listing.images && listing.images.length > 0 ? (
+            <img
+              src={listing.images[0]}
+              alt={listing.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/placeholder.svg';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              {listing.type === 'car' ? (
+                <Car className="w-16 h-16 text-muted-foreground" />
+              ) : (
+                <Building2 className="w-16 h-16 text-muted-foreground" />
+              )}
+            </div>
+          )}
           
           {/* Badges */}
           <div className="absolute top-3 left-3 flex items-center gap-2">

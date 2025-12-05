@@ -28,7 +28,10 @@ const Login = () => {
     
     try {
       // Combine country code and phone number
-      const fullPhone = (countryCode.dialCode.replace('+', '') + formData.phone.replace(/\D/g, '')).replace(/\s/g, '');
+      // Keep the + sign to match registration format
+      const fullPhone = countryCode.dialCode + formData.phone.replace(/\D/g, '');
+      
+      console.log('Logging in with phone:', fullPhone);
       
       // Call the API
       const response = await api.login(fullPhone, formData.password);
@@ -45,7 +48,28 @@ const Login = () => {
         window.location.href = '/dashboard';
       }
     } catch (error: any) {
-      toast.error(error.message || 'Erreur de connexion. Vérifiez vos identifiants.');
+      console.error('Login error:', error);
+      // Show more detailed error message from backend
+      let errorMessage = 'Erreur de connexion. Vérifiez vos identifiants.';
+      
+      if (error.response) {
+        // Backend validation errors
+        if (error.response.phone) {
+          errorMessage = Array.isArray(error.response.phone) ? error.response.phone[0] : error.response.phone;
+        } else if (error.response.password) {
+          errorMessage = Array.isArray(error.response.password) ? error.response.password[0] : error.response.password;
+        } else if (error.response.non_field_errors) {
+          errorMessage = Array.isArray(error.response.non_field_errors) ? error.response.non_field_errors[0] : error.response.non_field_errors;
+        } else if (error.response.detail) {
+          errorMessage = error.response.detail;
+        } else if (error.response.message) {
+          errorMessage = error.response.message;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       setIsLoading(false);
     }
   };

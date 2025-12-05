@@ -10,10 +10,26 @@ class PhoneBackend(BaseBackend):
         if phone is None:
             phone = kwargs.get('phone')
         
-        try:
-            user = User.objects.get(phone=phone)
-        except User.DoesNotExist:
+        if not phone:
             return None
+        
+        # Normalize phone number - try with and without +
+        phone_normalized = phone.strip()
+        phone_without_plus = phone_normalized.lstrip('+')
+        
+        try:
+            # Try exact match first
+            user = User.objects.get(phone=phone_normalized)
+        except User.DoesNotExist:
+            try:
+                # Try without + sign
+                user = User.objects.get(phone=phone_without_plus)
+            except User.DoesNotExist:
+                try:
+                    # Try with + sign
+                    user = User.objects.get(phone=f'+{phone_without_plus}')
+                except User.DoesNotExist:
+                    return None
         
         if user.check_password(password) and self.user_can_authenticate(user):
             return user

@@ -24,6 +24,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return ListingCreateSerializer
         elif self.action == 'list':
+            # Use full serializer for admin users to get all images
+            if self.request.user.is_staff:
+                return ListingSerializer
             return ListingListSerializer
         return ListingSerializer
     
@@ -100,8 +103,9 @@ class ListingViewSet(viewsets.ModelViewSet):
     def my_listings(self, request):
         """Get current user's listings."""
         listings = self.get_queryset().filter(user=request.user)
-        serializer = self.get_serializer(listings, many=True)
-        return Response(serializer.data)
+        # Use ListingSerializer to get full data including images
+        serializer = ListingSerializer(listings, many=True, context={'request': request})
+        return Response({'results': serializer.data})
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):
