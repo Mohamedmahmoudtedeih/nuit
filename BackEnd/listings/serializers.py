@@ -1,6 +1,9 @@
 from rest_framework import serializers
+from django.core.exceptions import ValidationError
+from django.core.files.images import get_image_dimensions
 from accounts.serializers import UserSerializer
 from .models import Listing, ListingImage, CarDetails, PropertyDetails
+import os
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
@@ -64,16 +67,58 @@ class ListingCreateSerializer(serializers.ModelSerializer):
     images = serializers.ListField(
         child=serializers.ImageField(),
         write_only=True,
-        required=False
+        required=False,
+        max_length=10  # Maximum 10 images per listing
     )
     car_details = CarDetailsSerializer(required=False)
     property_details = PropertyDetailsSerializer(required=False)
+    
+    # Allowed image MIME types
+    ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
+    
+    def validate_images(self, value):
+        """Validate uploaded images for security."""
+        if not value:
+            return value
+        
+        if len(value) > 10:
+            raise ValidationError("Maximum 10 images allowed per listing.")
+        
+        for image in value:
+            # Check file size
+            if image.size > self.MAX_IMAGE_SIZE:
+                raise ValidationError(f"Image size exceeds {self.MAX_IMAGE_SIZE / (1024*1024)}MB limit.")
+            
+            # Check file type
+            if hasattr(image, 'content_type'):
+                if image.content_type not in self.ALLOWED_IMAGE_TYPES:
+                    raise ValidationError(f"Invalid image type. Allowed types: {', '.join(self.ALLOWED_IMAGE_TYPES)}")
+            
+            # Check file extension
+            ext = os.path.splitext(image.name)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+                raise ValidationError("Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp")
+            
+            # Validate image dimensions (prevent extremely large images)
+            try:
+                width, height = get_image_dimensions(image)
+                if width and height:
+                    if width > 5000 or height > 5000:
+                        raise ValidationError("Image dimensions too large. Maximum: 5000x5000 pixels")
+                    if width < 100 or height < 100:
+                        raise ValidationError("Image dimensions too small. Minimum: 100x100 pixels")
+            except Exception:
+                raise ValidationError("Invalid image file. Cannot read image dimensions.")
+        
+        return value
     
     class Meta:
         model = Listing
         fields = [
             'title', 'description', 'type', 'purpose', 'price', 'currency',
-            'location', 'ad_type', 'images', 'car_details', 'property_details'
+            'location', 'ad_type', 'images', 'car_details', 'property_details',
+            'status'  # ⚠️ VULNERABLE FIELD: Allows direct status manipulation
         ]
     
     def create(self, validated_data):
@@ -86,7 +131,11 @@ class ListingCreateSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         validated_data['user'] = user
         
-        # Create listing
+        # ⚠️ VULNERABILITY: Status can be set directly without admin approval
+        # If status is provided in validated_data, it will be used directly
+        # This allows bypassing the admin approval process
+        
+        # Create listing (status will be set if provided in validated_data)
         listing = Listing.objects.create(**validated_data)
         
         # Create images

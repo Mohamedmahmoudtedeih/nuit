@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+import re
 from .models import Listing
 from .serializers import ListingSerializer, ListingCreateSerializer, ListingListSerializer
 
@@ -30,15 +33,37 @@ class ListingViewSet(viewsets.ModelViewSet):
             return ListingListSerializer
         return ListingSerializer
     
+    def _validate_numeric_param(self, value, param_name, min_val=None, max_val=None):
+        """Validate and sanitize numeric query parameters."""
+        try:
+            num_value = float(value)
+            if min_val is not None and num_value < min_val:
+                raise ValidationError(f"{param_name} must be >= {min_val}")
+            if max_val is not None and num_value > max_val:
+                raise ValidationError(f"{param_name} must be <= {max_val}")
+            return num_value
+        except (ValueError, TypeError):
+            raise ValidationError(f"{param_name} must be a valid number")
+    
+    def _sanitize_string_param(self, value, max_length=255):
+        """Sanitize string parameters to prevent injection attacks."""
+        if not value:
+            return None
+        # Remove potentially dangerous characters
+        sanitized = re.sub(r'[<>"\';\\]', '', str(value))
+        # Limit length
+        sanitized = sanitized[:max_length].strip()
+        return sanitized if sanitized else None
+    
     def get_queryset(self):
-        """Filter queryset based on query parameters."""
+        """Filter queryset based on query parameters with security validation."""
         queryset = Listing.objects.all()
         
         # Filter by approved status for public listings
         if self.action == 'list' and not self.request.user.is_staff:
             queryset = queryset.filter(status='approved')
         
-        # Additional filters
+        # Additional filters with validation
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
         location = self.request.query_params.get('location')
@@ -54,30 +79,73 @@ class ListingViewSet(viewsets.ModelViewSet):
         min_bathrooms = self.request.query_params.get('min_bathrooms')
         min_area = self.request.query_params.get('min_area')
         
+        # Validate and filter numeric parameters (Django ORM automatically prevents SQL injection)
         if min_price:
-            queryset = queryset.filter(price__gte=min_price)
+            try:
+                min_price_val = self._validate_numeric_param(min_price, 'min_price', min_val=0)
+                queryset = queryset.filter(price__gte=min_price_val)
+            except ValidationError:
+                pass  # Ignore invalid parameters
+        
         if max_price:
-            queryset = queryset.filter(price__lte=max_price)
+            try:
+                max_price_val = self._validate_numeric_param(max_price, 'max_price', min_val=0)
+                queryset = queryset.filter(price__lte=max_price_val)
+            except ValidationError:
+                pass
+        
+        # Sanitize and filter string parameters (Django ORM uses parameterized queries)
         if location:
-            queryset = queryset.filter(location__icontains=location)
+            location_sanitized = self._sanitize_string_param(location, max_length=255)
+            if location_sanitized:
+                queryset = queryset.filter(location__icontains=location_sanitized)
         
-        # Car filters
+        # Car filters with validation
         if make:
-            queryset = queryset.filter(car_details__make__icontains=make)
-        if min_year:
-            queryset = queryset.filter(car_details__year__gte=min_year)
-        if max_year:
-            queryset = queryset.filter(car_details__year__lte=max_year)
+            make_sanitized = self._sanitize_string_param(make, max_length=100)
+            if make_sanitized:
+                queryset = queryset.filter(car_details__make__icontains=make_sanitized)
         
-        # Property filters
+        if min_year:
+            try:
+                min_year_val = self._validate_numeric_param(min_year, 'min_year', min_val=1900, max_val=2100)
+                queryset = queryset.filter(car_details__year__gte=int(min_year_val))
+            except ValidationError:
+                pass
+        
+        if max_year:
+            try:
+                max_year_val = self._validate_numeric_param(max_year, 'max_year', min_val=1900, max_val=2100)
+                queryset = queryset.filter(car_details__year__lte=int(max_year_val))
+            except ValidationError:
+                pass
+        
+        # Property filters with validation
         if property_type:
-            queryset = queryset.filter(property_details__property_type=property_type)
+            property_type_sanitized = self._sanitize_string_param(property_type, max_length=50)
+            if property_type_sanitized:
+                queryset = queryset.filter(property_details__property_type=property_type_sanitized)
+        
         if min_bedrooms:
-            queryset = queryset.filter(property_details__bedrooms__gte=min_bedrooms)
+            try:
+                min_bedrooms_val = self._validate_numeric_param(min_bedrooms, 'min_bedrooms', min_val=0, max_val=50)
+                queryset = queryset.filter(property_details__bedrooms__gte=int(min_bedrooms_val))
+            except ValidationError:
+                pass
+        
         if min_bathrooms:
-            queryset = queryset.filter(property_details__bathrooms__gte=min_bathrooms)
+            try:
+                min_bathrooms_val = self._validate_numeric_param(min_bathrooms, 'min_bathrooms', min_val=0, max_val=50)
+                queryset = queryset.filter(property_details__bathrooms__gte=int(min_bathrooms_val))
+            except ValidationError:
+                pass
+        
         if min_area:
-            queryset = queryset.filter(property_details__area__gte=min_area)
+            try:
+                min_area_val = self._validate_numeric_param(min_area, 'min_area', min_val=0)
+                queryset = queryset.filter(property_details__area__gte=min_area_val)
+            except ValidationError:
+                pass
         
         return queryset.select_related('user', 'car_details', 'property_details').prefetch_related('images')
     

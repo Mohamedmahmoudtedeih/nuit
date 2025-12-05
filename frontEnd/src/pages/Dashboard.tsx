@@ -200,10 +200,10 @@ const Dashboard = () => {
       {/* Image */}
       <div className="w-20 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-muted flex items-center justify-center">
         {listing.images && listing.images.length > 0 ? (
-          <img
-            src={listing.images[0]}
-            alt={listing.title}
-            className="w-full h-full object-cover"
+        <img
+          src={listing.images[0]}
+          alt={listing.title}
+          className="w-full h-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/placeholder.svg';
             }}
